@@ -5,6 +5,11 @@
 #include <OneWire.h> 
 #include <DallasTemperature.h>
 
+//Uncomment untuk ganti device
+#define device1
+//#define device2
+//#define device3
+
 #define adc1 35
 #define adc2 33
 #define ONE_WIRE_BUS 26
@@ -17,6 +22,18 @@ GravityTDS gravityTds;
 const char* ssid = "HUAWEI-dE3F";   // your network SSID (name) 
 const char* password = "wifirumah";   // your network password
 
+#ifdef device1
+float kValue = 1.08;
+#endif
+
+#ifdef device2
+float kValue = 1.05;
+#endif
+
+#ifdef device3
+float kValue = 1.08;
+#endif
+
 String thingSpeakAddress = "api.thingspeak.com";
 String writeAPIKey = "E10B160ZCFRPP0OQ";
 String tsfield1Name;
@@ -26,7 +43,7 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 25200;
 const int   daylightOffset_sec = 0;
 
-float calibration_value = 21.34 - 1.4;
+float calibration_value = 21.34 - 0.9;
 float temperature = 30,tdsValue = 0;
  
 void setup()
@@ -46,7 +63,7 @@ void setup()
   gravityTds.setPin(adc1);
   gravityTds.setAref(3.3);  //reference voltage on ADC, default 5.0V on Arduino UNO
   gravityTds.setAdcRange(4096);  //1024 for 10bit ADC;4096 for 12bit ADC
-  gravityTds.setKvalue(0.5);
+  gravityTds.setKvalue(kValue);
   gravityTds.begin();  //initialization
     
   //init and get the time
@@ -58,14 +75,19 @@ float test[5];
 
 void loop()
 {    
-    float adcin = analogRead(adc2);
-    Serial.println(adcin);
+    float adcin;
+
+    for (int i = 0;i < 5; i++) {
+      adcin += analogRead(adc2);
+    }
+    adcin/=5.0;
+        
     float PH = readPH(adcin);
     Serial.print(PH);
     Serial.println("PH");
     
     readTds();
-    //kirim_thingspeak(test[0],test[1],test[2],test[3],test[4]);
+    kirim_thingspeak(temperature,PH,tdsValue);
     printLocalTime();
     delay(1000);
 }
@@ -74,7 +96,9 @@ void loop()
 float readPH(int adc){
   float voltage = adc*3.3/4096;
   //return 7+((2.5-voltage)/0.18);  
-  return -5.70 * voltage + calibration_value;
+  //return -5.70 * voltage + calibration_value;
+  float output = -5.47169 * voltage + 20.56981;
+  return output;
 }
 
 
@@ -86,39 +110,59 @@ void readTds(){
    gravityTds.update();  //sample and calculate
    tdsValue = gravityTds.getTdsValue();  // then get the value
    Serial.print(temperature);
-   Serial.println(" celcius");
+   Serial.print(" celcius - ");
    Serial.print(tdsValue);
-   Serial.println("ppm");
+   Serial.print("ppm - ");
    Serial.print(kval);
    Serial.println(" kval");
    
 }
 
-void kirim_thingspeak(float par1, float par2 ,float par3, float par4, float par5) {
+void kirim_thingspeak(float par1, float par2 ,float par3) {
   if (client.connect("api.thingspeak.com", 80)) {
     request_string = "/update?";
     request_string += "key=";
     request_string += writeAPIKey;
     request_string += "&";
+    
+    #ifdef device1
     request_string += "field1";
     request_string += "=";
-    request_string += par1;
+    request_string += par1;//SUHU
     request_string += "&";
     request_string += "field2";
     request_string += "=";
-    request_string += par2;
+    request_string += par2;//PH
     request_string += "&";
     request_string += "field3";
     request_string += "=";
-    request_string += par3;
-    request_string += "&";
+    request_string += par3;//PPM
+    #endif
+    
+    #ifdef device2
     request_string += "field4";
     request_string += "=";
-    request_string += par4;
+    request_string += par1;
     request_string += "&";
     request_string += "field5";
     request_string += "=";
-    request_string += par5;
+    request_string += "0.0";
+    request_string += "&";
+    request_string += "field6";
+    request_string += "=";
+    request_string += par3;
+    #endif
+    
+    #ifdef device3
+    request_string += "field8";
+    request_string += "=";
+    request_string += par1;
+    request_string += "&";
+    request_string += "field9";
+    request_string += "=";
+    request_string += par3;
+    #endif
+    
     Serial.println(String("GET ") + request_string + " HTTP/1.1\r\n" +
                  "Host: " + thingSpeakAddress + "\r\n" +
                  "Connection: close\r\n\r\n");
